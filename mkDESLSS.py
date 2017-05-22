@@ -16,10 +16,8 @@ import pylab as plb
 from random import random
 
 inputdir = '/Users/ashleyross/DESY1/' #directory for input data
-#inputfile = 'DESY1_1415mc.ssv' #change to whatever input file is
-#inputfile = 'DESY1_1435red.ssv'
-inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
-#inputfile = 'DESY1lss_wspread.csv' #change to whatever input file is
+#inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
+inputfile = 'Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits'
 outf = inputfile.split('.')
 #define how to read data from input file
 exten = inputfile.split('.')[-1]
@@ -30,6 +28,9 @@ if exten == 'ssv':
     spls = ' '
 if exten == 'dat':
     spls = ' '
+if exten == 'fits':
+    spls = ' '
+    exten = 'dat'
 footmask = inputdir+'y1a1_gold_1.0.2_wide_footprint_4096.fit'
 badmask = inputdir+'y1a1_gold_1.0.2_wide_badmask_4096.fit'
 depthmap = inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_i_10sigma.fits'
@@ -150,6 +151,31 @@ def maskd(res,dl=22):
     fo.close()
     return True
 
+def mksampfitsBPZ():
+    import fitsio
+    f = fitsio.read(inputdir+inputfile)
+    maskf = open(outdir+'Y1'+mf+str(dl)+syscut+'4096ring.dat')
+    print outdir+'Y1'+mf+str(dl)+syscut+'4096ring.dat'
+    np = 12*4096*4096
+    mask = []
+    for i in range(0,np):
+        mask.append(0)
+    for line in maskf:
+        pix = int(float(line.split()[0]))
+        mask[pix] = 1
+    outf = inputfile.split('.')
+    fo = open(outdir+'Y1red'+outf[0]+photoz+test+'.dat','w')
+    for i in range(0,len(f)):
+        z = f[i]['MEAN_Z']
+        magi = f[i]['mag_auto_i']
+        if magi < 19.0 + 3.0*z and z > 0.6 and z < 1.1:
+            ra,dec = f[i]['ra'],f[i]['dec']
+            th,phi = radec2thphi(ra,dec)
+            p = hp.ang2pix(4096,th,phi)
+            if mask[p] == 1:
+                fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(f[i]['Z_MC'])+' '+str(f[i]['coadd_objects_id'])+'\n')
+    fo.close()
+    return True
 
 class mksample:
     def __init__(self):
@@ -823,6 +849,9 @@ def mkgalmapY1red(res,zmin,zmax,wm='',wo=False):
     gl = []
     for i in range(0,12*res*res):
         gl.append(0)
+    #if inputfile =='Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits':
+    #    f = open(outdir+'Y1_LSS_AUTO_MOF_BPZv1_m22.'+exten)
+    #else:
     f = open(outdir+'Y1red'+outf[0]+photoz+test+wm+'.dat')
     ngt = 0
     w = 1.
@@ -1378,24 +1407,25 @@ if __name__ == '__main__':
 
     #comment out the above after first run
 #stellar density 1D
-    putngalvnstar3jackN(.6,.65)
-    putngalvnstar3jackN(.65,.7)
-    putngalvnstar3jackN(.7,.75)
-    putngalvnstar3jackN(.75,.8)
-    putngalvnstar3jackN(.8,.85)
-    putngalvnstar3jackN(.85,.9)
-    putngalvnstar3jackN(.9,.95)
-    putngalvnstar3jackN(.95,1.)
-    writestfit()
-    addstweight()
+    mksampfitsBPZ()
+#    putngalvnstar3jackN(.6,.65)
+#    putngalvnstar3jackN(.65,.7)
+#    putngalvnstar3jackN(.7,.75)
+#    putngalvnstar3jackN(.75,.8)
+#    putngalvnstar3jackN(.8,.85)
+#    putngalvnstar3jackN(.85,.9)
+#    putngalvnstar3jackN(.9,.95)
+#    putngalvnstar3jackN(.95,1.)
+#    writestfit()
+#    addstweight()
 #add seeing weight, fit over full range
-    wst = 'wst'
-    sys = 'seei'
-    smin = 2.5
-    smax = 4.0
-    seemap = mkseemap()
-    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
-    addseeweightone()
+#    wst = 'wst'
+#    sys = 'seei'
+#    smin = 2.5
+#    smax = 4.0
+#    seemap = mkseemap()
+#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
+#    addseeweightone()
 #below are tests that are sometimes nice to do
 #test after weighting
 #    putngalvnstar3jackN(.75,.8,wm='wst')
