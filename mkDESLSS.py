@@ -17,10 +17,13 @@ from random import random
 
 inputdir = '/Users/ashleyross/DESY1/' #directory for input data
 maskdir = '/Users/ashleyross/DESY1/Y1masks/'
+
+#Old input files
 #inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
 #inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
 #inputfile = 'Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits'
-inputfile = 'LSS_Y1_PZ_merge_v1.1.csv'
+
+inputfile = 'LSS_Y1_PZ_merge_v1.1.csv' #this file should include all photozs, using common set of color/mag cuts
 outf = inputfile.split('.')
 #define how to read data from input file
 exten = inputfile.split('.')[-1]
@@ -46,22 +49,28 @@ starmap = 'y1a1_gold_1.0.2_stars_nside0512.fits'
 outdir = '/Users/ashleyross/DESY1/test/'
 maskout = outdir+'Y1LSSmask_v2_redlimcut_il22_seeil4.0_4096ring.dat' #mask created by Jack/Martin including redlimcut
 
-photoz = 'MEAN_Z_DNF_MOF' #column name in data base for what is used to split data by redshift, etc.
-photozmc = 'Z_MC_DNF_MOF' #column name for mc draw for photoz from its pdf
-#photoz = 'MEAN_Z_BPZv1_MOF_ORIG' #column name in data base for what is used to split data by redshift, etc.
-#photozmc = 'Z_MC_BPZv1_MOF_ORIG' #column name for mc draw for photoz from its pdf
+#Use these for DNF
+#photoz = 'MEAN_Z_DNF_MOF' #column name in data base for what is used to split data by redshift, etc.
+#photozmc = 'Z_MC_DNF_MOF' #column name for mc draw for photoz from its pdf
+
+#Use these for BPZ MOF
+photoz = 'MEAN_Z_BPZv1_MOF_ORIG' #column name in data base for what is used to split data by redshift, etc.
+photozmc = 'Z_MC_BPZv1_MOF_ORIG' #column name for mc draw for photoz from its pdf
+
+#old
 #photoz = 'mean_z_bpz' #column name in data base for what is used to split data by redshift, etc.
 #photozmc = 'z_mc_bpz' #column name for mc draw for photoz from its pdf
 dl = 22
 fracd = .8
-mf = 'LSSmask_mof_redlimcut_il'
-#seeic = 4. #was used for i band cut
-seeic = 3.7 #testing for z-band cute
+mf = 'LSSmask_mof_redlimcut_il' #mask name, for some reason, gets changed by hand before putting on wiki
+seeic = 3.7 #testing for z-band cut
 syscut = 'seezl'+str(seeic)
-#syscut = 'seeil'+str(seeic) #use if constructing full mask from scratch
-#syscut = '_seeil4.0_am' #use if reconstructing from previous full mask file
 #syscut = '' #use if not cutting on seeing
-#mf='goldFoot_fracdet4TEST'+str(fracd)+'wide_iautodepth' #used a few times downstream
+
+#was used for BPZ mag auto catalogs
+#seeic = 4. #was used for i band cut
+#syscut = 'seeil'+str(seeic) #use if constructing full mask from scratch
+
 header = open(inputdir+inputfile).readline().split(spls)
 test = ''#'test' #toggle this to change whether it is the test file being worked on
 
@@ -1549,47 +1558,57 @@ def masksyscut(file,syscut):
 
 if __name__ == '__main__':
 #do everything
-    #maskY1_tot()
-    #maskY1see()
-    #maskd(512)
-    #m = mksample_merge() #for new, merged file, initialize class, gets column names
-    #m.createmaskedY1redsimp()
-#    m = mksample() #for old file, initialize class, gets column names
-#    m.createmaskedY1simp() #only masks sample
-#    m.mkRedsampradeczsimp() #only write out relevant columns from simple masking
-#    mksampfitsBPZ() #was used with fits file, should be depreciated
 
+#make mask, comment out after first run because it takes a while
+    #maskY1_tot() #total mask, without seeing cut
+    #maskY1see() #add seeing cut
+    #maskd(512) #degrade mask to what is used for stellar density tests
 
-#stellar density 1D
-#    putngalvnstar3jackN(.6,.65)
-#    putngalvnstar3jackN(.65,.7)
-#    putngalvnstar3jackN(.7,.75)
-#    putngalvnstar3jackN(.75,.8)
-#    putngalvnstar3jackN(.8,.85)
-#    putngalvnstar3jackN(.85,.9)
-#    putngalvnstar3jackN(.9,.95)
-#    putngalvnstar3jackN(.95,1.)
-#    writestfit()
-#    addstweight()
+#select columns from merged file
+    m = mksample_merge() #for new, merged file, initialize class, gets column names
+    m.createmaskedY1redsimp()
+
+#stellar density 1D fits and adding weights
+    putngalvnstar3jackN(.6,.65)
+    putngalvnstar3jackN(.65,.7)
+    putngalvnstar3jackN(.7,.75)
+    putngalvnstar3jackN(.75,.8)
+    putngalvnstar3jackN(.8,.85)
+    putngalvnstar3jackN(.85,.9)
+    putngalvnstar3jackN(.9,.95)
+    putngalvnstar3jackN(.95,1.)
+    writestfit()
+    addstweight()
+
 #add seeing weight, fit over full range
-#    wst = 'wst'
-#    sys = 'seei'
-#    smin = 2.5
-#    smax = 4.7
-#    seemap = mkseemap()
-#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
-#    addseeweightone(xlim=smax)
-#testing g-band depth weights
+    wst = 'wst'
+    sys = 'seei'
+    smin = 2.5
+    smax = 4.7
+    seemap = mkseemap()
+    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
+    addseeweightone(xlim=smax)
+
+#add g-band depth weights
     wst = 'wstsee'
     sys = 'depthg'
     smin = 21
     smax = 25
     gmap = hp.read_map(inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_g_10sigma.fits.gz')
-#    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-#    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-#    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-#    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
     addgdepthweight(gmap)
+
+#Catalog should be done! Things below are either old and there for posterity or are tests to be done
+
+#old catalog stuff
+#    m = mksample() #for old file, initialize class, gets column names
+#    m.createmaskedY1simp() #only masks sample
+#    m.mkRedsampradeczsimp() #only write out relevant columns from simple masking
+#    mksampfitsBPZ() #was used with fits file, should be depreciated
+
 
 #below are tests that are sometimes nice to do
 #test seeing weights
