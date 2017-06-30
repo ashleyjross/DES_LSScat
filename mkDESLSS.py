@@ -16,8 +16,11 @@ import pylab as plb
 from random import random
 
 inputdir = '/Users/ashleyross/DESY1/' #directory for input data
+maskdir = '/Users/ashleyross/DESY1/Y1masks/'
 #inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
-inputfile = 'Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits'
+#inputfile = 'BAO_red_v1622.ssv' #this one was used for VF
+#inputfile = 'Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits'
+inputfile = 'LSS_Y1_PZ_merge_v1.1.csv'
 outf = inputfile.split('.')
 #define how to read data from input file
 exten = inputfile.split('.')[-1]
@@ -31,25 +34,33 @@ if exten == 'dat':
 if exten == 'fits':
     spls = ' '
     exten = 'dat'
-footmask = inputdir+'y1a1_gold_1.0.2_wide_footprint_4096.fit'
-badmask = inputdir+'y1a1_gold_1.0.2_wide_badmask_4096.fit'
-depthmap = inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_i_10sigma.fits'
+footmask = maskdir+'y1a1_gold_1.0.2_wide_footprint_4096.fit'
+#badmask = maskdir+'y1a1_gold_1.0.2_wide_badmask_4096.fit'
+badmask = inputdir+'y1a1_gold_1.0.3_wide_badmask_4096.fits.gz'
+depthmap = maskdir+'y1a1_gold_1.0.2_wide_auto_nside4096_i_10sigma.fits'
 badammask = inputdir+'Y1A1NEW_COADD_SPT_AIRMASSge1_band_z_nside4096_oversamp4_AIRMASS__mean.fits.gz'
 #fracdetmap = inputdir+'Y1A1_SPT_and_S82_IMAGE_SRC_band_i_nside4096_oversamp4_count__fracdet.fits.gz'
-fracdetmap = inputdir +'Y1A1_WIDE_frac_combined_griz_o.4096_t.32768_EQU.fits.gz'
-maskredcut = inputdir + 'Y1LSSmask_2rz23.7.dat' #depth mask for other bands involved in color cuts
+fracdetmap = maskdir +'Y1A1_WIDE_frac_combined_griz_o.4096_t.32768_EQU.fits.gz'
+maskredcut = maskdir + 'Y1LSSmask_2rz23.7.dat' #depth mask for other bands involved in color cuts
 starmap = 'y1a1_gold_1.0.2_stars_nside0512.fits'
 outdir = '/Users/ashleyross/DESY1/test/'
 maskout = outdir+'Y1LSSmask_v2_redlimcut_il22_seeil4.0_4096ring.dat' #mask created by Jack/Martin including redlimcut
 
-photoz = 'mean_z_bpz' #column name in data base for what is used to split data by redshift, etc.
-photozmc = 'z_mc_bpz' #column name for mc draw for photoz from its pdf
+photoz = 'MEAN_Z_DNF_MOF' #column name in data base for what is used to split data by redshift, etc.
+photozmc = 'Z_MC_DNF_MOF' #column name for mc draw for photoz from its pdf
+#photoz = 'MEAN_Z_BPZv1_MOF_ORIG' #column name in data base for what is used to split data by redshift, etc.
+#photozmc = 'Z_MC_BPZv1_MOF_ORIG' #column name for mc draw for photoz from its pdf
+#photoz = 'mean_z_bpz' #column name in data base for what is used to split data by redshift, etc.
+#photozmc = 'z_mc_bpz' #column name for mc draw for photoz from its pdf
 dl = 22
 fracd = .8
-mf = 'LSSmask_v2_redlimcut_il'
-seeic = 4.
-syscut = 'seeil'+str(seeic) #use if constructing full mask from scratch
+mf = 'LSSmask_mof_redlimcut_il'
+#seeic = 4. #was used for i band cut
+seeic = 3.7 #testing for z-band cute
+syscut = 'seezl'+str(seeic)
+#syscut = 'seeil'+str(seeic) #use if constructing full mask from scratch
 #syscut = '_seeil4.0_am' #use if reconstructing from previous full mask file
+#syscut = '' #use if not cutting on seeing
 #mf='goldFoot_fracdet4TEST'+str(fracd)+'wide_iautodepth' #used a few times downstream
 header = open(inputdir+inputfile).readline().split(spls)
 test = ''#'test' #toggle this to change whether it is the test file being worked on
@@ -83,9 +94,12 @@ def maskY1_tot(dl=22,fracd=.8):
     print outdir+'Y1'+mf+str(dl)+'4096ring.dat'
     n = 0
     for i in range(0,np):
-        if dpm[i] > dl and mg[i] <= 3 and fm[i] >= 1 and fdm[i] > .8 and fam[i] != -1 and frc[i] == 1:
-            n += fdm[i]
-            fo.write(str(i)+' '+str(fdm[i])+'\n')
+        if dpm[i] > dl and mg[i] <= 3 and fm[i] >= 1 and fdm[i] > .8 and fam[i] != -1 and frc[i] == 1 and int(mg[i]) & 512 <=0:
+            th,phi = hp.pix2ang(4096,i)
+            ra,dec = thphi2radec(th,phi)
+            if ra > 50 or dec < -30:
+                n += fdm[i]
+                fo.write(str(i)+' '+str(fdm[i])+'\n')
     fo.close()
     ndeg = 360*360./pi*n/(12.*4096*4096)
     print n,ndeg
@@ -127,6 +141,25 @@ def maskY1see(seeic=seeic):
             fo.write(str(d[0][i])+' '+str(d[1][i])+'\n')
     fo.close()
     return True
+
+def maskY1seez(seeic=seeic):
+    d = numpy.loadtxt(outdir+'Y1'+mf+str(dl)+'4096ring.dat').transpose()
+    #f = fitsio.read(inputdir+'Y1A1NEW_COADD_SPT_band_z/Y1A1NEW_COADD_SPT_band_z_nside4096_oversamp4_FWHM_MEAN_coaddweights3_mean.fits.gz')
+    seemap = mkseemap(bnd='z')
+    #    np = 12*4096**2
+    #    for i in range(0,np):
+    #        seemap.append(0)
+    #    for i in range(0,len(f)):
+    #        p = f[i]['PIXEL']
+    #        seemap[p] = f[i]['SIGNAL']
+    fo = open(outdir+'Y1'+mf+str(dl)+'seezl'+str(seeic)+'4096ring.dat','w')
+    print outdir+'Y1'+mf+str(dl)+'seezl'+str(seeic)+'4096ring.dat'
+    for i in range(0,len(d[0])):
+        if seemap[int(d[0][i])] < seeic:
+            fo.write(str(d[0][i])+' '+str(d[1][i])+'\n')
+    fo.close()
+    return True
+
 
 def maskd(res,dl=22):
     #degrade mask
@@ -176,6 +209,67 @@ def mksampfitsBPZ():
                 fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(f[i]['Z_MC'])+' '+str(f[i]['coadd_objects_id'])+'\n')
     fo.close()
     return True
+
+class mksample_merge:
+    def __init__(self):
+        self.findcolumns()
+    # find column numbers for important quantities EVERYONE DOUBLE CHECK THESE!
+    def findcolumns(self):
+        self.col_ra = findcol('RA')
+        self.col_dec = findcol('DEC')
+        self.col_gmag_auto = findcol('MAG_AUTO_G')
+        self.col_rmag_auto = findcol('MAG_AUTO_R')
+        self.col_imag_auto = findcol('MAG_AUTO_I')
+        self.col_zmag_auto = findcol('MAG_AUTO_Z')
+        self.col_pz = findcol(photoz)
+        self.col_pzmc = findcol(photozmc)
+        self.col_id = findcol('COADD_OBJECTS_ID')
+    
+    def createmaskedY1redsimp(self):
+        #mask file and apply imag cut
+        maskf = open(outdir+'Y1'+mf+str(dl)+syscut+'4096ring.dat')
+        print outdir+'Y1'+mf+str(dl)+syscut+'4096ring.dat'
+        np = 12*4096*4096
+        mask = []
+        for i in range(0,np):
+            mask.append(0)
+        for line in maskf:
+            pix = int(float(line.split()[0]))
+            mask[pix] = 1
+        outf = inputfile.split('.')
+        fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+'.dat','w')
+        fbo = open(outdir+'bad'+photoz+'.dat','w')
+        f = open(inputdir+inputfile)
+        f.readline() #assumes input file has one line header
+        nb = 0
+        ng = 0
+        for line in f:
+            ln = line.split(spls)
+            ra,dec = float(ln[self.col_ra]),float(ln[self.col_dec])
+            th,phi = radec2thphi(ra,dec)
+            p = hp.ang2pix(4096,th,phi)
+            if mask[p] == 1:
+                #magi = float(ln[self.col_imag_auto])
+                try:
+                    pz = float(ln[self.col_pz])
+                    #ng += 1
+                    #fo.write(ln[self.col_ra]+' '+ln[self.col_dec]+' '+str(pz)+' '+ln[self.col_pzmc].strip('\n')+' '+ln[self.col_id]+'\n')
+                except:
+                    #print ln[self.col_pz]
+                    nb += 1
+                    print nb
+                    fbo.write(str(ra)+' '+str(dec)+'\n')
+                    pz = 0
+                    pass
+                #if magi < 19.0 + 3.0*pz and pz > .6 and pz < 1.:
+                if pz > .6 and pz < 1.:
+                    ng += 1
+                    fo.write(ln[self.col_ra]+' '+ln[self.col_dec]+' '+str(pz)+' '+ln[self.col_pzmc].strip('\n')+' '+ln[self.col_id]+'\n')
+
+        print ng
+        fo.close()
+        return True
+
 
 class mksample:
     def __init__(self):
@@ -589,7 +683,7 @@ def writestfit():
         zl = 0.6+0.05*i
         zh = zl+.05
         zw = str(zl)+str(zh)
-        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+test+'vstarsjackerr')
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+syscut+test+'vstarsjackerr')
         fo.write(str(zl+.025)+' '+str(b)+' '+str(m)+'\n')
     fo.close()
     return True
@@ -667,7 +761,7 @@ def addseeweight():
 #    plt.show()
     return True
 
-def addseeweightone():
+def addseeweightone(xlim=4.5):
     #adds a weight for seeing as a function of redshift
     #1st step is to fit the slope at each redshift
     meansee = 3.44
@@ -675,11 +769,11 @@ def addseeweightone():
     zl = 0.6
     zh = 1.
     zw = str(zl)+str(zh)
-    b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+test+'wstvseeijackerr',xlim=4.0)
+    b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wst'+syscut+test+'vseeijackerr',xlim=xlim)
     print b
     cl = m
-    f = open(outdir+'Y1red'+outf[0]+photoz+test+'wst.dat')
-    fo = open(outdir+'Y1red'+outf[0]+photoz+test+'wstsee.dat','w')
+    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wst.dat')
+    fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wstsee.dat','w')
     fo.write('#ra dec zmean zmc wstar*wsee wsee wstar coadd_objects_id\n')
     nlsee = 0
     wseemax = 1
@@ -722,7 +816,7 @@ def addstweight():
         zl = 0.6+0.05*i
         zh = zl+.05
         zw = str(zl)+str(zh)
-        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+test+'vstarsjackerr',xlim=1.8)
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+syscut+test+'vstarsjackerr',xlim=1.8)
         print b
         cl.append(1.-b)
         ml.append(m)
@@ -770,8 +864,8 @@ def addstweight():
     stave = nst/summl
     print summl,sum(ml)
     print stave
-    f = open(outdir+'Y1red'+outf[0]+photoz+test+'.dat')
-    fo = open(outdir+'Y1red'+outf[0]+photoz+test+'wst.dat','w')
+    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'.dat')
+    fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wst.dat','w')
     for line in f:
         ln = line.split()
         z = float(ln[2])
@@ -789,9 +883,62 @@ def addstweight():
             w = 1.
             if nst >= 0:
                 w = 1./((1.-stc)+slp*nst)
-            fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w)+' '+str(int(ln[-1]))+'\n')
+            fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w)+' '+str(int(float(ln[-1])))+'\n')
     fo.close()
     return True
+
+def addgdepthweight(gmap):
+    #adds a weight for g band depth as a function of redshift
+    #1st step is to get coefficients in each z bin
+    cl = []
+    ml = []
+    for i in range(0,4):
+        zl = 0.6+0.1*i
+        zh = zl+.1
+        zw = str(zl)+str(zh)
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wstsee'+syscut+test+'vdepthgjackerr',xlim=30)
+        print b
+        cl.append(1.-b)
+        ml.append(m)
+    zl = [0.58,0.65,0.75,0.85,0.95,1.02] #low and high values needed to allow spline to work over full range
+    stl = [cl[0],cl[0],cl[1],cl[2],cl[3],cl[3]]
+    stsp = spline(zl,stl)
+    mtl = [ml[0],ml[0],ml[1],ml[2],ml[3],ml[3]]
+    msp = spline(zl,mtl)
+    #test spline
+    from matplotlib import pyplot as plt
+    zt = numpy.arange(.6,1.,.001)
+    stt = []
+    for i in range(0,len(zt)):
+        #stt.append(Splev(zt[i],stsp))
+        stt.append(Splev(stsp,zt[i]))
+    plt.plot(zt,stt,'k-',zl,stl,'ko')
+    plt.show()
+
+    meang = 23.67
+    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wstsee.dat')
+    f.readline()
+    fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wstseegdepth.dat','w')
+    fo.write('#ra dec z z_mc wtot wdepth wsee wst id\n')
+    for line in f:
+        ln = line.split()
+        z = float(ln[2])
+        zmc = float(ln[3])
+        if z >= 0.6 and z <= 1.0:
+            stc = Splev(stsp,z)
+            slp = stc/meang
+            #slp = Splev(msp,z)
+            ra,dec = float(ln[0]),float(ln[1])
+            th,phi = radec2thphi(ra,dec)
+            p = hp.ang2pix(4096,th,phi)
+            nst = gmap[p]
+            w = 1.
+            if nst >= 0:
+                w = 1./((1.-stc)+slp*nst)
+            fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w*float(ln[4]))+' '+ str(w)+' '+ln[5]+' '+ln[6]+' '+str(int(float(ln[-1])))+'\n')
+    fo.close()
+    return True
+
 
 def addblindweight(res=512,blindf=.4):
     #adds a weight for stellar contamination as a function of redshift
@@ -852,7 +999,7 @@ def mkgalmapY1red(res,zmin,zmax,wm='',wo=False):
     #if inputfile =='Y1_LSS_AUTO_MOF_BPZv1.BPZ_mof_orig_sva1prior_priormag_mof_i.fits':
     #    f = open(outdir+'Y1_LSS_AUTO_MOF_BPZv1_m22.'+exten)
     #else:
-    f = open(outdir+'Y1red'+outf[0]+photoz+test+wm+'.dat')
+    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+wm+'.dat')
     ngt = 0
     w = 1.
     for line in f:
@@ -1011,8 +1158,8 @@ def testseemask():
 
 
 
-def mkseemap():
-    f = fitsio.read(inputdir+'Y1A1NEW_COADD_SPT_band_i_FWHM/Y1A1NEW_COADD_SPT_band_i_nside4096_oversamp4_FWHM_MEAN_coaddweights3_mean.fits.gz')
+def mkseemap(bnd='i'):
+    f = fitsio.read(inputdir+'Y1A1NEW_COADD_SPT_band_'+bnd+'/Y1A1NEW_COADD_SPT_band_'+bnd+'_nside4096_oversamp4_FWHM_MEAN_coaddweights3_mean.fits.gz')
     starl = []
     np = 12*4096**2
     for i in range(0,np):
@@ -1020,7 +1167,7 @@ def mkseemap():
     for i in range(0,len(f)):
         p = f[i]['PIXEL']
         starl[p] = f[i]['SIGNAL']
-    f = fitsio.read(inputdir+'Y1A1NEW_COADD_STRIPE82/nside4096_oversamp4/Y1A1NEW_COADD_STRIPE82_band_i_nside4096_oversamp4_FWHM_MEAN_coaddweights3_mean.fits.gz')
+    f = fitsio.read(inputdir+'Y1A1NEW_COADD_STRIPE82/nside4096_oversamp4/Y1A1NEW_COADD_STRIPE82_band_'+bnd+'_nside4096_oversamp4_FWHM_MEAN_coaddweights3_mean.fits.gz')
     for i in range(0,len(f)):
         p = f[i]['PIXEL']
         starl[p] = f[i]['SIGNAL']
@@ -1031,7 +1178,11 @@ def putngalvnstar3jackN(zmin=0,zmax=2,smin=0.0,smax=1.8,njack=20,res=512,t=.8,nb
     gall = mkgalmapY1red(res,zmin,zmax,wm=wm)
     if smd == 'stars':
         starl = hp.read_map(inputdir+'y1a1_gold_1.0.2_stars_nside0512.fits')
-    if mapin == False:
+    try:
+        print mapin[0]
+        starl = mapin
+    except:
+    #if mapin == False:
         if smd == 'depth':
             starl = hp.read_map(depthmap)
         if smd == 'seei':
@@ -1043,8 +1194,8 @@ def putngalvnstar3jackN(zmin=0,zmax=2,smin=0.0,smax=1.8,njack=20,res=512,t=.8,nb
             for i in range(0,len(f)):
                 p = f[i]['PIXEL']
                 starl[p] = f[i]['SIGNAL']
-    else:
-        starl = mapin
+#   else:
+#    starl = mapin
     sysl,mt,smin,smax,bcl = ngalvnstarsysl(gall,starl,dl,res=res,t=t,nbin=nbin,smin=smin,smax=smax,smd=smd,decmin=decmin,decmax=decmax)
     print mt
     sl = []
@@ -1086,7 +1237,7 @@ def putngalvnstar3jackN(zmin=0,zmax=2,smin=0.0,smax=1.8,njack=20,res=512,t=.8,nb
     rw = ''
     rw += pz
     rw += wm
-    fo = open(outdir+'Y1red'+outf[0]+str(zmin)+str(zmax)+rw+test+'v'+smd+'jackerr.dat','w')
+    fo = open(outdir+'Y1red'+outf[0]+str(zmin)+str(zmax)+rw+syscut+test+'v'+smd+'jackerr.dat','w')
     for i in range(0,nbin):
         slb = sl[i]
         st = i*(smax-smin)/float(nbin)+(smax-smin)/nbin/2.+smin
@@ -1398,16 +1549,18 @@ def masksyscut(file,syscut):
 
 if __name__ == '__main__':
 #do everything
-#    maskY1_tot()
-#    maskY1see()
-#    maskd(512)
-#    m = mksample() #initialize class, gets column names
+    #maskY1_tot()
+    #maskY1see()
+    #maskd(512)
+    #m = mksample_merge() #for new, merged file, initialize class, gets column names
+    #m.createmaskedY1redsimp()
+#    m = mksample() #for old file, initialize class, gets column names
 #    m.createmaskedY1simp() #only masks sample
 #    m.mkRedsampradeczsimp() #only write out relevant columns from simple masking
+#    mksampfitsBPZ() #was used with fits file, should be depreciated
 
-    #comment out the above after first run
+
 #stellar density 1D
-    mksampfitsBPZ()
 #    putngalvnstar3jackN(.6,.65)
 #    putngalvnstar3jackN(.65,.7)
 #    putngalvnstar3jackN(.7,.75)
@@ -1422,11 +1575,44 @@ if __name__ == '__main__':
 #    wst = 'wst'
 #    sys = 'seei'
 #    smin = 2.5
-#    smax = 4.0
+#    smax = 4.7
 #    seemap = mkseemap()
 #    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
-#    addseeweightone()
+#    addseeweightone(xlim=smax)
+#testing g-band depth weights
+    wst = 'wstsee'
+    sys = 'depthg'
+    smin = 21
+    smax = 25
+    gmap = hp.read_map(inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_g_10sigma.fits.gz')
+#    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+    addgdepthweight(gmap)
+
 #below are tests that are sometimes nice to do
+#test seeing weights
+#    wst = 'wstsee'
+#    sys = 'seei'
+#    smin = 2.5
+#    smax = 4.7
+#    seemap = mkseemap()
+#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
+
+#test seeing
+#    sys = 'seei'
+#    smin = 1.5
+#    smax = 6.0
+#    seemap = mkseemap()
+#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm='',pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
+#    sys = 'seez'
+#    smin = 1.5
+#    smax = 6.0
+#    seemap = mkseemap(bnd='z')
+#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm='',pz=photoz,smd=sys,bnd='z',decmin=-70,decmax=5,mapin=seemap)
+
+
 #test after weighting
 #    putngalvnstar3jackN(.75,.8,wm='wst')
 #    putngalvnstar3jackN(.75,.8,wm='wstsee')
