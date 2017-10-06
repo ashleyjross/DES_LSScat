@@ -50,12 +50,12 @@ outdir = '/Users/ashleyross/DESY1/test/'
 maskout = outdir+'Y1LSSmask_v2_redlimcut_il22_seeil4.0_4096ring.dat' #mask created by Jack/Martin including redlimcut
 
 #Use these for DNF
-#photoz = 'MEAN_Z_DNF_MOF' #column name in data base for what is used to split data by redshift, etc.
-#photozmc = 'Z_MC_DNF_MOF' #column name for mc draw for photoz from its pdf
+photoz = 'MEAN_Z_DNF_MOF' #column name in data base for what is used to split data by redshift, etc.
+photozmc = 'Z_MC_DNF_MOF' #column name for mc draw for photoz from its pdf
 
 #Use these for BPZ MOF
-photoz = 'MEAN_Z_BPZv1_MOF_ORIG' #column name in data base for what is used to split data by redshift, etc.
-photozmc = 'Z_MC_BPZv1_MOF_ORIG' #column name for mc draw for photoz from its pdf
+#photoz = 'MEAN_Z_BPZv1_MOF_ORIG' #column name in data base for what is used to split data by redshift, etc.
+#photozmc = 'Z_MC_BPZv1_MOF_ORIG' #column name for mc draw for photoz from its pdf
 
 #old
 #photoz = 'mean_z_bpz' #column name in data base for what is used to split data by redshift, etc.
@@ -697,6 +697,19 @@ def writestfit():
     fo.close()
     return True
 
+def writestfit1():
+    fo = open(outdir+'Y1redstfits1'+outf[0]+photoz+'.dat','w')
+    fo.write('#zcen intercept slope\n')
+    for i in range(0,4):
+        zl = 0.6+0.1*i
+        zh = zl+.1
+        zw = str(zl)+str(zh)
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+syscut+test+'vstarsjackerr')
+        fo.write(str(zl+.05)+' '+str(b)+' '+str(m)+'\n')
+    fo.close()
+    return True
+
+
 def writeseefit(xlim=4.):
     fo = open(outdir+'Y1redseeifits'+outf[0]+photoz+'.dat','w')
     fo.write('#zcen intercept slope\n')
@@ -769,6 +782,19 @@ def addseeweight():
 #    plt.ylabel('galaxy density/mean galaxy density',size=16)
 #    plt.show()
     return True
+
+def doseefitone(xlim=4.5):
+    #adds a weight for seeing as a function of redshift
+    #1st step is to fit the slope at each redshift
+    #meansee = 3.44
+    #seemap = mkseemap()
+    zl = 0.6
+    zh = 1.
+    zw = str(zl)+str(zh)
+    b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wst'+syscut+test+'vseeijackerr',xlim=xlim)
+    print b,m
+    return True
+
 
 def addseeweightone(xlim=4.5):
     #adds a weight for seeing as a function of redshift
@@ -896,8 +922,8 @@ def addstweight():
     fo.close()
     return True
 
-def addgdepthweight(gmap):
-    #adds a weight for g band depth as a function of redshift
+def dogdepthfits(sys='depthg',sysin='wstsee'):
+    #adds a weight for depth map as a function of redshift
     #1st step is to get coefficients in each z bin
     cl = []
     ml = []
@@ -905,7 +931,20 @@ def addgdepthweight(gmap):
         zl = 0.6+0.1*i
         zh = zl+.1
         zw = str(zl)+str(zh)
-        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wstsee'+syscut+test+'vdepthgjackerr',xlim=30)
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wstsee'+syscut+test+'v'+sys+'jackerr',xlim=1000)
+        print b,m
+    return True
+
+def addgdepthweight(gmap,sys='depthg',sysin='wstsee'):
+    #adds a weight for depth map as a function of redshift
+    #1st step is to get coefficients in each z bin
+    cl = []
+    ml = []
+    for i in range(0,4):
+        zl = 0.6+0.1*i
+        zh = zl+.1
+        zw = str(zl)+str(zh)
+        b,m = dolinbestfit('Y1red'+outf[0]+zw+photoz+'wstsee'+syscut+test+'v'+sys+'jackerr',xlim=1000)
         print b
         cl.append(1.-b)
         ml.append(m)
@@ -923,12 +962,14 @@ def addgdepthweight(gmap):
         stt.append(Splev(stsp,zt[i]))
     plt.plot(zt,stt,'k-',zl,stl,'ko')
     plt.show()
-
-    meang = 23.67
-    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wstsee.dat')
+    
+    mm = hp.ma(gmap)
+    meang = numpy.mean(mm)
+#meang = 23.67
+    f = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+sysin+'.dat')
     f.readline()
-    fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+'wstseegdepth.dat','w')
-    fo.write('#ra dec z z_mc wtot wdepth wsee wst id\n')
+    fo = open(outdir+'Y1red'+outf[0]+photoz+syscut+test+sysin+sys+'.dat','w')
+    fo.write('#ra dec z z_mc wtot wdepth'+sys+' wsee wst id\n')
     for line in f:
         ln = line.split()
         z = float(ln[2])
@@ -944,7 +985,11 @@ def addgdepthweight(gmap):
             w = 1.
             if nst >= 0:
                 w = 1./((1.-stc)+slp*nst)
-            fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w*float(ln[4]))+' '+ str(w)+' '+ln[5]+' '+ln[6]+' '+str(int(float(ln[-1])))+'\n')
+            if sysin == 'wstsee':
+                fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w*float(ln[4]))+' '+ str(w)+' '+ln[5]+' '+ln[6]+' '+str(int(float(ln[-1])))+'\n')
+            else:
+                fo.write(str(ra)+' '+str(dec)+' '+str(z)+' '+str(zmc)+' '+str(w*float(ln[4]))+' '+ str(w*float(ln[5]))+' '+ln[6]+' '+ln[7]+' '+str(int(float(ln[-1])))+'\n')
+                    
     fo.close()
     return True
 
@@ -1565,41 +1610,75 @@ if __name__ == '__main__':
     #maskd(512) #degrade mask to what is used for stellar density tests
 
 #select columns from merged file
-    m = mksample_merge() #for new, merged file, initialize class, gets column names
-    m.createmaskedY1redsimp()
+#    m = mksample_merge() #for new, merged file, initialize class, gets column names
+#    m.createmaskedY1redsimp()
 
 #stellar density 1D fits and adding weights
-    putngalvnstar3jackN(.6,.65)
-    putngalvnstar3jackN(.65,.7)
-    putngalvnstar3jackN(.7,.75)
-    putngalvnstar3jackN(.75,.8)
-    putngalvnstar3jackN(.8,.85)
-    putngalvnstar3jackN(.85,.9)
-    putngalvnstar3jackN(.9,.95)
-    putngalvnstar3jackN(.95,1.)
-    writestfit()
-    addstweight()
+#    putngalvnstar3jackN(.6,.65)
+#    putngalvnstar3jackN(.65,.7)
+#    putngalvnstar3jackN(.7,.75)
+#    putngalvnstar3jackN(.75,.8)
+#    putngalvnstar3jackN(.8,.85)
+#    putngalvnstar3jackN(.85,.9)
+#    putngalvnstar3jackN(.9,.95)
+#    putngalvnstar3jackN(.95,1.)
+#    writestfit()
+#    addstweight()
+
+#stellar density 1D fits in 0.1 range, for plots
+#putngalvnstar3jackN(.6,.7)
+#putngalvnstar3jackN(.7,.8)
+#putngalvnstar3jackN(.8,.9)
+#putngalvnstar3jackN(.9,1.)
+#writestfit1()
+#    doseefitone()
+    dogdepthfits()
 
 #add seeing weight, fit over full range
-    wst = 'wst'
-    sys = 'seei'
-    smin = 2.5
-    smax = 4.7
-    seemap = mkseemap()
-    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
-    addseeweightone(xlim=smax)
+#    wst = 'wst'
+#    sys = 'seei'
+#    smin = 2.5
+#    smax = 4.7
+#    seemap = mkseemap()
+#    putngalvnstar3jackN(zmin=0.6,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='i',decmin=-70,decmax=5,mapin=seemap)
+#    addseeweightone(xlim=smax)
 
 #add g-band depth weights
-    wst = 'wstsee'
-    sys = 'depthg'
-    smin = 21
-    smax = 25
-    gmap = hp.read_map(inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_g_10sigma.fits.gz')
-    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
-    addgdepthweight(gmap)
+#    wst = 'wstsee'
+#    sys = 'depthg'
+#    smin = 21
+#    smax = 25
+#    gmap = hp.read_map(inputdir+'y1a1_gold_1.0.2_wide_auto_nside4096_g_10sigma.fits.gz')
+#    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    addgdepthweight(gmap)
+#
+
+#alternatively, add pca depth weights
+#pc0
+#    wst = 'wstsee'
+#    sys = 'pc0'
+#    smin = 44
+#    smax = 46
+#    gmap = hp.read_map(inputdir+'/depth_magauto_pca/'+sys+'.fits.gz')
+#    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    addgdepthweight(gmap,sysin=wst,sys=sys)
+#add pc1
+#    wst = 'wstseepc0'
+#    sys = 'pc1'
+#    smin = -.4
+#    smax = .7
+#    gmap = hp.read_map(inputdir+'/depth_magauto_pca/'+sys+'.fits.gz')
+#    putngalvnstar3jackN(zmin=0.6,zmax=.7,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.7,zmax=.8,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    putngalvnstar3jackN(zmin=0.8,zmax=.9,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)#    putngalvnstar3jackN(zmin=0.9,zmax=1.,smin=smin,smax=smax,res=4096,t=.2,wm=wst,pz=photoz,smd=sys,bnd='g',decmin=-70,decmax=5,mapin=gmap)
+#    addgdepthweight(gmap,sysin=wst,sys=sys)
+
 
 #Catalog should be done! Things below are either old and there for posterity or are tests to be done
 
